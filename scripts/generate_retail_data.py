@@ -3,47 +3,31 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 
-
-# ---------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------
-
 NUM_RECORDS = 5000
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "data" / "raw"
 
-
-# ---------------------------------------------------------
 # Generate a unique batch identifier
-# ---------------------------------------------------------
 
 batch_timestamp = datetime.now()
 
-# Example:
-# 20260913161530
 batch_id = batch_timestamp.strftime("%Y%m%d%H%M%S")
 
 # Create order IDs that are always greater than the old
 # 100001-style IDs and unique for each generated batch.
-order_id_start = int(batch_timestamp.strftime("%y%m%d%H%M%S")) * 1000
+order_id_start = int(batch_timestamp.strftime("%y%m%d%H%M%S%f")) // 1000
 
 order_ids = range(
     order_id_start,
     order_id_start + NUM_RECORDS
 )
 
-
-# ---------------------------------------------------------
 # Random generator
-# ---------------------------------------------------------
-
 rng = np.random.default_rng()
 
-
-# ---------------------------------------------------------
 # Reference data
-# ---------------------------------------------------------
 
 products = [
     "Laptop",
@@ -96,10 +80,7 @@ product_prices = {
     "Smartwatch": 8000,
 }
 
-
-# ---------------------------------------------------------
 # Generate sales data
-# ---------------------------------------------------------
 
 dates = pd.date_range(
     start=batch_timestamp - pd.Timedelta(days=30),
@@ -155,20 +136,14 @@ sales = pd.DataFrame(
     }
 )
 
-
-# ---------------------------------------------------------
 # Calculate total amount
-# ---------------------------------------------------------
 
 sales["total_amount"] = (
     sales["quantity"]
     * sales["unit_price"]
 ).round(2)
 
-
-# ---------------------------------------------------------
 # Introduce controlled data-quality issues
-# ---------------------------------------------------------
 
 missing_count = min(
     10,
@@ -186,10 +161,7 @@ sales.loc[
     "payment_method"
 ] = None
 
-
-# ---------------------------------------------------------
 # Save batch file
-# ---------------------------------------------------------
 
 OUTPUT_DIR.mkdir(
     parents=True,
@@ -206,10 +178,7 @@ sales.to_csv(
     index=False
 )
 
-
-# ---------------------------------------------------------
 # Output information
-# ---------------------------------------------------------
 
 print("Dataset created successfully!")
 print(f"Batch ID: {batch_id}")
