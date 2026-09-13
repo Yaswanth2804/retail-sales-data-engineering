@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: stg_retail_sales
+    description: "Staging view for retail sales data loaded from Snowflake RAW."
+    columns:
+      - name: ORDER_ID
+        tests:
+          - not_null
+          - unique
+
+      - name: CUSTOMER_ID
+        tests:
+          - not_null
+
+      - name: TOTAL_AMOUNT
+        tests:
+          - not_null
+
+  - name: fact_sales
+    description: "Fact table containing retail sales transactions."
+    columns:
+      - name: ORDER_ID
+        tests:
+          - not_null
+          - unique
+
+      - name: CUSTOMER_ID
+        tests:
+          - not_null
+
+      - name: TOTAL_AMOUNT
+        tests:
+          - not_null
+
+  - name: sales_daily
+    description: "Daily aggregated retail sales metrics."
+    columns:
+      - name: SALES_DATE
+        tests:
+          - not_null
+          - unique
+
+      - name: TOTAL_ORDERS
+        tests:
+          - not_null
+
+      - name: TOTAL_UNITS_SOLD
+        tests:
+          - not_null
+
+      - name: TOTAL_REVENUE
+        tests:
+          - not_null
+
+      - name: AVERAGE_ORDER_VALUE
+        tests:
+          - not_null
+
+  - name: dim_customer
+    description: "Customer dimension containing unique customers and their city."
+    columns:
+      - name: CUSTOMER_ID
+        tests:
+          - not_null
+          - unique
+
+      - name: CITY
+        tests:
+          - not_null
+
+  - name: dim_product
+    description: "Product dimension containing product, category, and unit price."
+    columns:
+      - name: PRODUCT
+        tests:
+          - not_null
+          - unique
+
+      - name: CATEGORY
+        tests:
+          - not_null
+
+      - name: UNIT_PRICE
+        tests:
+          - not_null

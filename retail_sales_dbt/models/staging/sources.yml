@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: retail_sales
+    database: RETAIL_SALES_DB
+    schema: RAW
+    tables:
+      - name: retail_sales

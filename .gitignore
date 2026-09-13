@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+
+# Airflow
+airflow.cfg
+airflow.db
+airflow/logs/
+logs/
+airflow/simple_auth_manager_passwords.json.generated
+
+# dbt
+target/
+dbt_packages/
+
+# Generated data
+data/raw/*.csv
+data/processed/*
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
