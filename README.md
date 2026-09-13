@@ -10,48 +10,95 @@ The pipeline generates retail sales data in batches, uploads the data to Amazon 
 Python Data Generator
         |
         v
-  Retail CSV Batch
+Retail CSV Batch
         |
         v
-     AWS S3
-   Raw Data Layer
+AWS S3
+(Raw Data Layer)
         |
         v
-   Snowflake RAW
+Snowflake RAW
         |
         v
-        dbt
+dbt Transformations
+        |
+        +----------------------+
+        |                      |
+        v                      v
+Dimension Tables          FACT_SALES
+                          |
+                          v
+                     SALES_DAILY
+                          |
+                          v
+                    Analytics Layer
+```
+
+### Execution Environment
+
+```text
+Windows Local Development
+        |
+        v
+Docker Environment
         |
         +-------------------+
         |                   |
         v                   v
-   Dimension Tables    FACT_SALES
-                            |
-                            v
-                      SALES_DAILY
-                            |
-                            v
-                     Analytics Layer
+Apache Airflow            dbt
+        |
+        +-------------------+
+        |
+        v
+Python Scripts
+        |
+        +-------------------+
+        |                   |
+        v                   v
+     AWS S3             Snowflake
+```
 
-Apache Airflow
-orchestrates the complete workflow
-Technology Stack
-Technology	Purpose
-Python	Data generation and ingestion scripts
-Pandas	Dataset creation and processing
-NumPy	Synthetic data generation
-AWS S3	Cloud object storage for raw files
-Snowflake	Cloud data warehouse
-dbt	Data transformation and data-quality testing
-Apache Airflow	Pipeline orchestration
-Docker	Containerized Airflow environment
-PostgreSQL	Airflow metadata database
-SQL	Data loading and analytics
-Git	Version control
-Pipeline Workflow
+Airflow orchestrates the complete workflow, while Docker provides the local execution environment.
 
-The Airflow DAG executes the following tasks:
+## Technology Stack
 
+| Technology | Purpose |
+|---|---|
+| Python | Data generation and ingestion scripts |
+| Pandas | Dataset creation and processing |
+| NumPy | Synthetic data generation |
+| AWS S3 | Cloud object storage for raw CSV files |
+| Snowflake | Cloud data warehouse |
+| SQL | Data loading and analytical queries |
+| dbt | Data transformation, modeling, and testing |
+| Apache Airflow | Workflow orchestration |
+| Docker | Local containerized execution environment |
+| Git & GitHub | Version control and project hosting |
+
+## Pipeline Workflow
+
+```text
+Generate Data
+     |
+     v
+Upload to S3
+     |
+     v
+Load New File into Snowflake RAW
+     |
+     v
+Run dbt Transformations
+     |
+     v
+Run dbt Data Tests
+     |
+     v
+Analytics-Ready Data
+```
+
+The complete workflow is orchestrated by the Airflow DAG:
+
+```text
 generate_data
       |
       v
@@ -65,306 +112,333 @@ dbt_run
       |
       v
 dbt_test
-1. Generate Data
+```
 
-Python generates a new retail sales batch containing 5,000 records.
+## 1. Data Generation
 
-The dataset contains:
+Retail sales data is generated using Python, Pandas, and NumPy.
 
-Order ID
-Order date
-Customer ID
-Product
-Category
-Quantity
-Unit price
-City
-Payment method
-Total amount
+The generator creates batch-based CSV files containing:
 
-Each execution generates a new batch with unique order IDs and a timestamp-based filename.
+- Order ID
+- Order date
+- Customer ID
+- Product
+- Category
+- Quantity
+- Unit price
+- City
+- Payment method
+- Total amount
+
+Each execution generates a new timestamped batch.
 
 Example:
 
+```text
 retail_sales_20260913161039.csv
-2. Upload to Amazon S3
+```
 
-The generated CSV is uploaded to:
+Controlled data-quality issues such as missing payment methods are introduced to demonstrate validation and data-quality testing.
 
-s3://retail-sales-analytics-pipeline-2728/raw/
+## 2. AWS S3 Raw Data Layer
 
-Each batch is stored as a separate object.
+Generated CSV files are uploaded to an Amazon S3 bucket.
 
-This allows the pipeline to process new files without repeatedly loading the same source file.
+Example structure:
 
-3. Load Data into Snowflake
+```text
+retail-sales-analytics-pipeline-2728/
+└── raw/
+    ├── retail_sales_20260913161039.csv
+    ├── retail_sales_20260913171118.csv
+    └── ...
+```
 
-Snowflake accesses the S3 bucket through an external stage and storage integration.
+S3 acts as the raw data layer and source for Snowflake ingestion.
 
-The setup uses:
+## 3. Snowflake Data Warehouse
 
-AWS IAM Role
-       |
-       v
-Snowflake Storage Integration
-       |
-       v
-External Stage
-       |
-       v
-Snowflake RAW table
+Snowflake contains two schemas:
 
-Snowflake load history prevents an already processed file from being loaded again.
+```text
+RETAIL_SALES_DB
+├── RAW
+│   ├── RETAIL_SALES
+│   └── RETAIL_SALES_STAGE
+│
+└── ANALYTICS
+    ├── STG_RETAIL_SALES
+    ├── DIM_CUSTOMER
+    ├── DIM_PRODUCT
+    ├── FACT_SALES
+    └── SALES_DAILY
+```
 
-4. dbt Transformations
+### RAW Layer
 
-dbt transforms the Snowflake RAW table into analytics models.
+The `RAW.RETAIL_SALES` table stores the ingested source data.
 
-Current models:
+### ANALYTICS Layer
 
-stg_retail_sales
-        |
-        +----------------+
-        |                |
-        v                v
- dim_customer       dim_product
-        \                /
-         \              /
-          v            v
-            fact_sales
-                |
-                v
-           sales_daily
-Data Models
-stg_retail_sales
+dbt transforms the raw data into analytics-ready models.
 
-A staging model used to prepare source data for downstream transformations.
+## 4. dbt Transformations
 
-dim_customer
+The dbt project contains five primary models.
 
-Customer-level dimension containing customer information such as customer ID and city.
+### Staging
 
-dim_product
+`stg_retail_sales`
 
-Product-level dimension containing product, category, and pricing information.
+Cleans and standardizes the raw retail sales data.
 
-fact_sales
+### Dimension Models
 
-Incremental fact model containing sales transactions.
+`dim_customer`
 
-The model uses ORDER_ID as the unique key and processes newly arriving records based on the maximum existing order ID.
+Contains customer-level information such as:
 
-Conceptually:
+- Customer ID
+- City
 
-WHERE ORDER_ID > (
-    SELECT MAX(ORDER_ID)
-    FROM {{ this }}
-)
-sales_daily
+`dim_product`
 
-Daily sales aggregation containing:
+Contains product-level information such as:
 
-Sales date
-Total orders
-Total units sold
-Total revenue
-Average order value
-Incremental Processing
+- Product
+- Category
+- Unit price
 
-The pipeline is designed to process new data batches incrementally.
+### Fact Model
 
-For example:
+`fact_sales`
 
-Batch 1
-5,000 records
-       |
-       v
-RAW
-5,000
+Contains sales transaction-level data.
 
-Batch 2
-5,000 records
-       |
-       v
-RAW
-10,000
+The model is configured as an incremental model using `ORDER_ID` as the unique key.
 
-Batch 3
-5,000 records
-       |
-       v
-RAW
-15,000
+```sql
+{{ config(
+    materialized='incremental',
+    unique_key='ORDER_ID'
+) }}
+```
 
-Additional records already present in the RAW table are not duplicated in the dbt incremental fact model.
+On incremental runs, only records with a greater `ORDER_ID` than the existing maximum are processed.
 
-The project was tested through multiple Airflow runs and currently processed:
+### Aggregated Model
 
-RAW rows:       20,003
-FACT_SALES rows: 20,003
-Data Quality
+`sales_daily`
 
-The generated dataset intentionally contains missing payment methods to demonstrate data-quality validation.
+Aggregates sales by date and calculates:
 
-dbt tests currently include 21 tests.
+- Total orders
+- Total units sold
+- Total revenue
+- Average order value
 
-The latest full dbt test run completed successfully:
+## 5. Incremental Processing
 
-PASS=21
-WARN=0
-ERROR=0
+The pipeline supports incremental batch ingestion.
 
-Examples of validation areas include:
+The workflow is:
 
-Required field validation
-Unique order IDs
-Accepted values
-Referential relationships
-Source data checks
-Airflow
+```text
+New CSV Batch
+     |
+     v
+S3
+     |
+     v
+Snowflake COPY INTO
+     |
+     v
+RAW.RETAIL_SALES
+     |
+     v
+dbt Incremental FACT_SALES
+     |
+     v
+SALES_DAILY
+```
 
-Airflow runs inside Docker.
+Snowflake load history prevents previously loaded files from being loaded again.
 
-Main services:
+dbt incremental processing prevents already processed fact records from being rebuilt unnecessarily.
 
-PostgreSQL
+## 6. Data Quality
+
+The dbt project includes automated data-quality tests.
+
+The tests validate aspects such as:
+
+- Required fields
+- Unique order IDs
+- Valid relationships
+- Accepted values
+- Source data integrity
+
+The pipeline successfully completed:
+
+```text
+5 dbt models
+21 dbt data tests
+0 errors
+0 warnings
+```
+
+## 7. Apache Airflow
+
+Apache Airflow orchestrates the complete pipeline.
+
+The DAG is:
+
+```text
+retail_sales_pipeline
+```
+
+Tasks:
+
+```text
+generate_data
+      |
+upload_to_s3
+      |
+load_snowflake
+      |
+dbt_run
+      |
+dbt_test
+```
+
+Airflow runs inside Docker along with the supporting local services.
+
+## 8. Docker Environment
+
+Docker provides a reproducible local environment for Airflow and dbt.
+
+Main Airflow components include:
+
+```text
 Airflow API Server
 Airflow Scheduler
 Airflow DAG Processor
+```
 
-The production DAG is:
+The dbt project is mounted into the Docker environment and executed as part of the Airflow workflow.
 
-retail_sales_pipeline
+## Project Structure
 
-DAG location:
-
-airflow/dags/retail_sales_pipeline.py
-
-The DAG is currently manually triggerable and executes:
-
-Generate data
-      ↓
-Upload to S3
-      ↓
-Load Snowflake RAW
-      ↓
-Run dbt
-      ↓
-Run dbt tests
-
-A complete end-to-end DAG execution has been successfully tested multiple times.
-
-Project Structure
+```text
 Retail-Sales-Data-Engineering/
-|
+│
 ├── airflow/
 │   ├── dags/
 │   │   └── retail_sales_pipeline.py
 │   ├── Dockerfile
 │   └── docker-compose.yaml
-|
+│
 ├── data/
 │   ├── raw/
 │   └── processed/
-|
+│
 ├── retail_sales_dbt/
-│   ├── dbt_project.yml
 │   ├── models/
 │   │   ├── staging/
-│   │   ├── marts/
+│   │   │   ├── sources.yml
+│   │   │   └── stg_retail_sales.sql
+│   │   ├── dim_customer.sql
+│   │   ├── dim_product.sql
+│   │   ├── fact_sales.sql
+│   │   ├── sales_daily.sql
 │   │   └── schema.yml
-│   └── ...
-|
+│   └── dbt_project.yml
+│
 ├── scripts/
 │   ├── generate_retail_data.py
 │   ├── upload_to_s3.py
 │   └── load_snowflake.py
-|
-├── sql/
-│   └── ...
-|
-├── docs/
-│   └── ...
-|
+│
 ├── .gitignore
 └── README.md
-AWS S3 Configuration
+```
 
-The pipeline uses Amazon S3 as the raw data landing zone.
+## Running the Project
 
-The Snowflake integration uses an AWS IAM role instead of embedding AWS credentials inside the Snowflake stage configuration.
+### 1. Generate Retail Data
 
-This provides a cleaner separation between:
+```powershell
+python scripts/generate_retail_data.py
+```
 
-AWS IAM
-Snowflake Storage Integration
-S3 External Stage
-Snowflake Architecture
+This generates a new timestamped CSV batch inside:
 
-Database:
+```text
+data/raw/
+```
 
-RETAIL_SALES_DB
+### 2. Upload Data to S3
 
-Schemas:
+```powershell
+python scripts/upload_to_s3.py
+```
 
-RAW
-ANALYTICS
+The latest generated CSV file is uploaded to the S3 raw data layer.
 
-Raw table:
+### 3. Load Data into Snowflake
 
-RETAIL_SALES_DB.RAW.RETAIL_SALES
+```powershell
+python scripts/load_snowflake.py
+```
 
-Analytics models:
+The script identifies the latest CSV file in the Snowflake stage and loads it into the RAW table.
 
-RETAIL_SALES_DB.ANALYTICS.STG_RETAIL_SALES
-RETAIL_SALES_DB.ANALYTICS.DIM_CUSTOMER
-RETAIL_SALES_DB.ANALYTICS.DIM_PRODUCT
-RETAIL_SALES_DB.ANALYTICS.FACT_SALES
-RETAIL_SALES_DB.ANALYTICS.SALES_DAILY
-Running the Pipeline
+Snowflake load history prevents previously loaded files from being loaded again.
 
-Start the Docker services:
+### 4. Run dbt
 
-docker compose up -d
+From the dbt project directory:
 
-Check the Airflow services:
-
-docker compose ps
-
-Open Airflow:
-
-http://localhost:8080
-
-Trigger the DAG:
-
-docker compose exec airflow-scheduler airflow dags trigger retail_sales_pipeline
-
-Check the DAG run:
-
-docker compose exec airflow-scheduler airflow dags list-runs retail_sales_pipeline
-Running dbt Manually
-
-From inside the Airflow container:
-
-docker compose exec airflow-scheduler bash -c "cd /opt/dbt/retail_sales_dbt && dbt run"
+```powershell
+cd retail_sales_dbt
+dbt run
+```
 
 Run data-quality tests:
 
-docker compose exec airflow-scheduler bash -c "cd /opt/dbt/retail_sales_dbt && dbt test"
-Example Analytics
+```powershell
+dbt test
+```
 
-The sales_daily model supports analysis such as:
+### 5. Run Airflow
 
-Daily revenue
-Daily order volume
-Units sold
-Average order value
-Product performance
-Customer activity
-Category-level sales
+Start the Docker environment:
 
-Example query:
+```powershell
+cd airflow
+docker compose up -d
+```
 
+Open Airflow:
+
+```text
+http://localhost:8080
+```
+
+Trigger:
+
+```text
+retail_sales_pipeline
+```
+
+## Analytics
+
+The final `SALES_DAILY` model provides daily sales metrics.
+
+Example analytical query:
+
+```sql
 SELECT
     SALES_DATE,
     TOTAL_ORDERS,
@@ -373,77 +447,96 @@ SELECT
     AVERAGE_ORDER_VALUE
 FROM RETAIL_SALES_DB.ANALYTICS.SALES_DAILY
 ORDER BY SALES_DATE DESC;
-Key Data Engineering Concepts Demonstrated
+```
 
-This project demonstrates:
+These datasets can be used for:
 
-Batch data ingestion
-Cloud object storage
-AWS IAM roles
-Snowflake external stages
-Snowflake storage integrations
-RAW and analytics layers
-Dimensional modeling
-Incremental dbt models
-dbt data-quality testing
-Airflow orchestration
-Docker containerization
-Python-based data generation
-SQL transformations
-Idempotent file ingestion through Snowflake load history
-Challenges Solved
-Snowflake and AWS authentication
+- Sales performance analysis
+- Revenue trends
+- Product analysis
+- Customer analysis
+- Daily sales reporting
+- Business intelligence dashboards
 
-Configured a Snowflake storage integration with an AWS IAM role and external ID rather than using static AWS credentials for Snowflake access.
+## Key Data Engineering Concepts Demonstrated
 
-Airflow 3 execution API
+- ETL / ELT pipeline design
+- Batch data processing
+- Cloud object storage
+- Snowflake data warehousing
+- External stages
+- Incremental loading
+- dbt transformations
+- Data-quality testing
+- Workflow orchestration
+- Docker-based development
+- SQL analytics
+- Git version control
+- Reproducible data pipelines
 
-Configured the Airflow scheduler to communicate with the Airflow execution API inside Docker.
+## Challenges Solved
 
-Dockerized dbt
+### Incremental File Processing
 
-Built a custom Airflow Docker image with:
+The pipeline generates timestamped files and processes newly generated batches without repeatedly loading previously processed files.
 
-dbt-core 1.12.4
-dbt-snowflake 1.12.0
-Incremental processing
+### Duplicate File Protection
 
-Designed timestamped source files and unique order IDs so new batches can be processed incrementally.
+Snowflake load history identifies previously loaded files and skips them.
 
-Duplicate file protection
+### Incremental dbt Models
 
-Snowflake load history prevents the same staged file from being loaded multiple times.
+`FACT_SALES` uses dbt incremental materialization to process new records efficiently.
 
-Project Outcome
+### Data Quality
 
-The final pipeline successfully performs:
+Controlled missing values and dbt tests demonstrate how data-quality issues can be detected and validated.
 
+### Workflow Orchestration
+
+Airflow connects generation, cloud storage, warehouse ingestion, transformation, and testing into one workflow.
+
+### Reproducible Local Environment
+
+Docker provides a consistent environment for Airflow and dbt.
+
+## Project Outcome
+
+The project demonstrates an end-to-end modern data engineering workflow:
+
+```text
 Python
-→ AWS S3
-→ Snowflake RAW
-→ dbt
-→ Snowflake Analytics
-→ dbt Tests
+  ↓
+AWS S3
+  ↓
+Snowflake RAW
+  ↓
+dbt
+  ↓
+Snowflake ANALYTICS
+  ↓
+SQL / BI Analytics
+```
 
-and is orchestrated end-to-end by Apache Airflow running inside Docker.
+The complete workflow is orchestrated using Apache Airflow and executed in a Docker-based local environment.
 
-The pipeline has been executed successfully across multiple incremental batches, with the current Snowflake RAW and FACT tables each containing 20,003 records.
+## Future Improvements
 
-Future Improvements
+Potential extensions include:
 
-Possible future enhancements include:
+- Scheduled Airflow DAG execution
+- Airflow connections and secret management
+- More granular AWS IAM permissions
+- Slowly Changing Dimensions
+- Additional data-quality checks
+- Monitoring and alerting
+- Snowflake performance optimization
+- BI dashboard integration
+- CI/CD for dbt and Airflow
+- Cloud deployment of Airflow
 
-Scheduled daily Airflow execution
-Cloud-based Airflow deployment
-More granular data-quality rules
-Slowly Changing Dimensions
-Snowflake warehouse optimization
-Data observability and alerting
-CI/CD for dbt
-GitHub Actions
-Dashboard integration using Power BI or Tableau
-Author
+## Author
 
-Yaswanth
+**Yaswanth**
 
-Data Engineering Portfolio Project
+Data Engineering | Python | SQL | Snowflake | AWS | Airflow | dbt
