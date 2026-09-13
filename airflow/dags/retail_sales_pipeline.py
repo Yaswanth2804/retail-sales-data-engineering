@@ -29,7 +29,7 @@ with DAG(
 
     dbt_run = BashOperator(
         task_id="dbt_run",
-        bash_command="cd /opt/dbt/retail_sales_dbt && rm -rf target && dbt run",
+        bash_command="cd /opt/dbt/retail_sales_dbt && dbt run",
     )
 
     dbt_test = BashOperator(

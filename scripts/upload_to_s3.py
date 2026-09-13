@@ -1,18 +1,16 @@
 import boto3
+import os
 from pathlib import Path
 
-
-# ---------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------
 
-BUCKET_NAME = "retail-sales-analytics-pipeline-2728"
+BUCKET_NAME = os.getenv(
+    "S3_BUCKET_NAME",
+    "retail-sales-analytics-pipeline-2728"
+)
 S3_PREFIX = "raw"
 
-
-# ---------------------------------------------------------
 # Locate the latest generated batch
-# ---------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "raw"
@@ -30,10 +28,7 @@ if not files:
 
 file_path = files[0]
 
-
-# ---------------------------------------------------------
 # Upload to S3
-# ---------------------------------------------------------
 
 s3 = boto3.client("s3")
 
@@ -45,10 +40,7 @@ s3.upload_file(
     s3_key
 )
 
-
-# ---------------------------------------------------------
 # Output
-# ---------------------------------------------------------
 
 print("Upload successful!")
 print(f"Local file: {file_path}")

@@ -74,7 +74,14 @@ try:
     for row in results:
         print(row)
 
+    status = results[0][1]
+
+if status == "LOADED":
     print("Snowflake RAW load completed successfully!")
+elif status == "LOAD_SKIPPED":
+    print("File was already loaded. No new rows inserted.")
+else:
+    print(f"Snowflake load completed with status: {status}")
 
 finally:
     cursor.close()
