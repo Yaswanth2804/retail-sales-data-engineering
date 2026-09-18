@@ -191,7 +191,7 @@ The dbt project contains five primary models.
 
 `stg_retail_sales`
 
-Cleans and standardizes the raw retail sales data.
+Provides a staging view over the raw retail sales data for downstream transformations.
 
 ### Dimension Models
 
@@ -273,11 +273,11 @@ The dbt project includes automated data-quality tests.
 
 The tests validate aspects such as:
 
-- Required fields
+- Required fields using not-null tests
 - Unique order IDs
-- Valid relationships
-- Accepted values
-- Source data integrity
+- Unique daily sales dates
+- Unique customer and product records
+- Required analytical metrics
 
 The pipeline successfully completed:
 
@@ -532,7 +532,7 @@ Potential extensions include:
 - Monitoring and alerting
 - Snowflake performance optimization
 - BI dashboard integration
-- CI/CD for dbt and Airflow
+- Extended CI/CD for dbt and Airflow deployment
 - Cloud deployment of Airflow
 
 ## Author
