@@ -33,6 +33,23 @@ Dimension Tables          FACT_SALES
                           v
                     Analytics Layer
 ```
+## Project Screenshots
+
+### Airflow Pipeline
+
+![Airflow successful DAG](docs/screenshots/airflow-success.png)
+
+### Snowflake Analytics
+
+![Snowflake FACT_SALES](docs/screenshots/snowflake-fact-sales.png)
+
+### dbt Data Quality Tests
+
+![dbt tests](docs/screenshots/dbt-tests.png)
+
+### GitHub Actions CI
+
+![GitHub Actions CI](docs/screenshots/github-actions.png)
 
 ### Execution Environment
 
